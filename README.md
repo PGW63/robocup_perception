@@ -17,6 +17,7 @@ subscription
 - /camera/camera/color/image_raw (Image)
 - /camera/camera/color/camera_info (CamInfo)
 - /camera/camera/aligned_depth_to_color/image_raw (Image)
+- /human/resume (Bool)
 
 publisher
 - /human/states (String) : 위의 State 중 하나에 해당되는 것을 발행
