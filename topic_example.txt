@@ -1,0 +1,220 @@
+data: P0:STANDING, P1:UNKNOWN
+
+markers:
+- header:
+    stamp:
+      sec: 1767683974
+      nanosec: 591023682
+    frame_id: camera_color_optical_frame
+  ns: skeleton_1_joints
+  id: 0
+  type: 7
+  action: 0
+  pose:
+    position:
+      x: 0.0
+      y: 0.0
+      z: 0.0
+    orientation:
+      x: 0.0
+      y: 0.0
+      z: 0.0
+      w: 1.0
+  scale:
+    x: 0.05
+    y: 0.05
+    z: 0.05
+  color:
+    r: 0.0
+    g: 1.0
+    b: 0.0
+    a: 1.0
+  lifetime:
+    sec: 0
+    nanosec: 200000000
+  frame_locked: false
+  points:
+  - x: -2.8611385913932548
+    y: 0.14403020997955174
+    z: 5.354
+  - x: -2.7576967662716876
+    y: 0.15157365802868575
+    z: 5.308
+  - x: -2.6437882236564434
+    y: 0.3271919266656785
+    z: 5.308
+  - x: -2.5605594147565647
+    y: 0.2721792437246643
+    z: 5.263
+  - x: -2.6583046630238742
+    y: 0.5456728961960062
+    z: 5.133
+  - x: -2.8611385913932548
+    y: 0.40974051808499423
+    z: 5.354
+  - x: -2.4143345599455284
+    y: 0.6952190801061228
+    z: 4.929
+  - x: -2.3817883187681743
+    y: 0.6626033134854845
+    z: 4.929
+  colors: []
+  texture_resource: ''
+  texture:
+    header:
+      stamp:
+        sec: 0
+        nanosec: 0
+      frame_id: ''
+    format: ''
+    data: []
+  uv_coordinates: []
+  text: ''
+  mesh_resource: ''
+  mesh_file:
+    filename: ''
+    data: []
+  mesh_use_embedded_materials: false
+- header:
+    stamp:
+      sec: 1767683974
+      nanosec: 591023682
+    frame_id: camera_color_optical_frame
+  ns: skeleton_1_bones
+  id: 1
+  type: 5
+  action: 0
+  pose:
+    position:
+      x: 0.0
+      y: 0.0
+      z: 0.0
+    orientation:
+      x: 0.0
+      y: 0.0
+      z: 0.0
+      w: 1.0
+  scale:
+    x: 0.02
+    y: 0.0
+    z: 0.0
+  color:
+    r: 0.0
+    g: 1.0
+    b: 0.0
+    a: 0.800000011920929
+  lifetime:
+    sec: 0
+    nanosec: 200000000
+  frame_locked: false
+  points:
+  - x: -2.8611385913932548
+    y: 0.14403020997955174
+    z: 5.354
+  - x: -2.7576967662716876
+    y: 0.15157365802868575
+    z: 5.308
+  - x: -2.6437882236564434
+    y: 0.3271919266656785
+    z: 5.308
+  - x: -2.5605594147565647
+    y: 0.2721792437246643
+    z: 5.263
+  - x: -2.6437882236564434
+    y: 0.3271919266656785
+    z: 5.308
+  - x: -2.6583046630238742
+    y: 0.5456728961960062
+    z: 5.133
+  - x: -2.6583046630238742
+    y: 0.5456728961960062
+    z: 5.133
+  - x: -2.8611385913932548
+    y: 0.40974051808499423
+    z: 5.354
+  - x: -2.6437882236564434
+    y: 0.3271919266656785
+    z: 5.308
+  - x: -2.4143345599455284
+    y: 0.6952190801061228
+    z: 4.929
+  - x: -2.5605594147565647
+    y: 0.2721792437246643
+    z: 5.263
+  - x: -2.3817883187681743
+    y: 0.6626033134854845
+    z: 4.929
+  - x: -2.4143345599455284
+    y: 0.6952190801061228
+    z: 4.929
+  - x: -2.3817883187681743
+    y: 0.6626033134854845
+    z: 4.929
+  colors: []
+  texture_resource: ''
+  texture:
+    header:
+      stamp:
+        sec: 0
+        nanosec: 0
+      frame_id: ''
+    format: ''
+    data: []
+  uv_coordinates: []
+  text: ''
+  mesh_resource: ''
+  mesh_file:
+    filename: ''
+    data: []
+  mesh_use_embedded_materials: false
+- header:
+    stamp:
+      sec: 1767683974
+      nanosec: 591023682
+    frame_id: camera_color_optical_frame
+  ns: skeleton_1_state
+  id: 2
+  type: 9
+  action: 0
+  pose:
+    position:
+      x: -2.3980614393568516
+      y: 0.3789111967958037
+      z: 4.929
+    orientation:
+      x: 0.0
+      y: 0.0
+      z: 0.0
+      w: 1.0
+  scale:
+    x: 0.0
+    y: 0.0
+    z: 0.15
+  color:
+    r: 1.0
+    g: 1.0
+    b: 1.0
+    a: 1.0
+  lifetime:
+    sec: 0
+    nanosec: 200000000
+  frame_locked: false
+  points: []
+  colors: []
+  texture_resource: ''
+  texture:
+    header:
+      stamp:
+        sec: 0
+        nanosec: 0
+      frame_id: ''
+    format: ''
+    data: []
+  uv_coordinates: []
+  text: STANDING
+  mesh_resource: ''
+  mesh_file:
+    filename: ''
+    data: []
+  mesh_use_embedded_materials: false
+---
