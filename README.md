@@ -24,3 +24,13 @@ publisher
 - /human/skeleton_markers (MarkerArray) : 스켈레톤의 좌표 및 State 발행
 - /human/debug_image (Image) : 시각화 디버깅 이미지
 
+topic example
+- /human/states
+  '''
+  data: P0:STANDING, P1:UNKNOWN
+  '''
+- /human/skeleton_markers
+  '''
+  ./topic_example.txt
+  '''
+
