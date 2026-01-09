@@ -15,7 +15,7 @@ import rclpy
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
 from sensor_msgs.msg import Image, CameraInfo
-from std_msgs.msg import String, ColorRGBA
+from std_msgs.msg import String, ColorRGBA, Bool
 from geometry_msgs.msg import Point
 from visualization_msgs.msg import Marker, MarkerArray
 from cv_bridge import CvBridge
@@ -65,7 +65,7 @@ class HumanStateDetector:
     def __init__(self):
         # === 손 들기 임계값 ===
         self.hand_up_wrist_above_shoulder = True  # 손목이 어깨보다 위
-        self.hand_up_elbow_angle_min = 120.0       # 팔꿈치 최소 각도 (90도 이상이면 펴짐)
+        self.hand_up_elbow_angle_min = 150.0       # 팔꿈치 최소 각도 (90도 이상이면 펴짐)
         
         # === 앉기 임계값 ===
         self.sitting_knee_angle_max = 130.0      # 무릎 각도 (130도 이하면 구부림)
@@ -297,6 +297,9 @@ class HumanStateDetectorNode(Node):
         self.camera_matrix = None
         self.dist_coeffs = None
         self.depth_image = None
+
+        # 상태 플래그
+        self.stop_flag = False
         
         # TF
         self.tf_buffer = tf2_ros.Buffer()
@@ -309,6 +312,9 @@ class HumanStateDetectorNode(Node):
         self.sub_img = self.create_subscription(Image, self.image_topic, self.on_image, qos)
         self.sub_info = self.create_subscription(CameraInfo, self.camera_info_topic, self.on_camera_info, 10)
         self.sub_depth = self.create_subscription(Image, self.depth_topic, self.on_depth, qos)
+
+        # self.stop_flag 변경
+        self.sub_flag = self.create_subscription(Bool, "/human/resume", self.flag_callback, 10)
         
         # 발행자
         self.pub_state = self.create_publisher(String, "/human/states", 10)
@@ -323,6 +329,9 @@ class HumanStateDetectorNode(Node):
         """카메라 내부 파라미터 수신"""
         self.camera_matrix = np.array(msg.k).reshape((3, 3))
         self.dist_coeffs = np.array(msg.d)
+        self.destroy_subscription(self.sub_info)
+        self.get_logger().info("Camera info received and camera matrix set.")
+        
     
     def on_depth(self, msg: Image):
         """뎁스 이미지 수신"""
@@ -330,6 +339,13 @@ class HumanStateDetectorNode(Node):
             self.depth_image = self.bridge.imgmsg_to_cv2(msg, desired_encoding="passthrough")
         except Exception as e:
             self.get_logger().warn(f"Depth conversion failed: {e}")
+    
+    def flag_callback(self, msg: Bool):
+        if self.stop_flag != msg.data:
+            rclpy.logging.get_logger("HumanStateDetectorNode").info(f"Setting stop_flag to {msg.data}")
+        self.stop_flag = msg.data
+
+
     
     def pixel_to_3d(self, u: int, v: int, depth_m: float) -> Optional[Point3D]:
         """2D 픽셀 좌표 + 깊이 → 3D 좌표"""
@@ -512,6 +528,10 @@ class HumanStateDetectorNode(Node):
     
     def on_image(self, msg: Image):
         """이미지 콜백"""
+        if self.stop_flag:
+            return
+        
+        
         try:
             bgr = self.bridge.imgmsg_to_cv2(msg, desired_encoding="bgr8")
         except Exception as e:
