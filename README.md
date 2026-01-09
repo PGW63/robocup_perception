@@ -16,7 +16,7 @@ TOPIC
 subscription
 - /camera/camera/color/image_raw (Image)
 - /camera/camera/color/camera_info (CamInfo)
-- /camera/camera/aligned_depth_to_color/image_raw (Image)
+- /camera/camera/aligned_depth_to_color/image_raw (Image) 
 - /human/resume (Bool)
 
 publisher
@@ -33,4 +33,11 @@ topic example
   '''
   ./topic_example.txt
   '''
+
+
+To Be modifed
+- 
+- change depth information from camera's depth to 3D LiDAR
+- Waving state
+- robust if else
 
