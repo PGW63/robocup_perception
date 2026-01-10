@@ -1,9 +1,10 @@
 from launch import LaunchDescription
 from launch_ros.actions import Node
-from launch.actions import DeclareLaunchArgument, ExecuteProcess
+from launch.actions import DeclareLaunchArgument, ExecuteProcess, OpaqueFunction
 from launch.substitutions import LaunchConfiguration
+from launch.conditions import IfCondition
 
-def generate_launch_description():
+def launch_setup(context, *args, **kwargs):
     image_topic_name = LaunchConfiguration('image_topic_name')
     image_transport = LaunchConfiguration('image_transport')
     camera_info_topic_name = LaunchConfiguration('camera_info_topic_name')
@@ -11,42 +12,6 @@ def generate_launch_description():
     enable_pointcloud = LaunchConfiguration('enable_pointcloud')
     enable_depth_ema = LaunchConfiguration('enable_depth_ema')
     search_timeout = LaunchConfiguration('search_timeout')
-
-    image_topic_name_arg = DeclareLaunchArgument(
-        'image_topic_name',
-        default_value='/camera/camera/color/image_raw/compressed',
-        description='Image topic name to subscribe to'
-    )
-    image_transport_arg = DeclareLaunchArgument(
-        'image_transport',
-        default_value='compressed',
-        description='Image transport type (raw or compressed)'
-    )
-    camera_info_topic_name_arg = DeclareLaunchArgument(
-        'camera_info_topic_name',
-        default_value='/camera/camera/color/camera_info',
-        description='Camera info topic name to subscribe to'
-    )
-    depth_topic_name_arg = DeclareLaunchArgument(
-        'depth_topic_name',
-        default_value='/camera/camera/depth/aligned_depth_to_color/image_raw',
-        description='Depth topic name to subscribe to'
-    )
-    enable_pointcloud_arg = DeclareLaunchArgument(
-        'enable_pointcloud',
-        default_value='true',
-        description='Enable pointcloud generation'
-    )
-    enable_depth_ema_arg = DeclareLaunchArgument(
-        'enable_depth_ema',
-        default_value='true',
-        description='Enable Depth EMA filtering'
-    )
-    search_timeout_arg = DeclareLaunchArgument(
-        'search_timeout',
-        default_value='2.0',
-        description='Timeout for searching objects in seconds'
-    )
 
     yolo_node = Node(
         package='perception',
@@ -78,7 +43,48 @@ def generate_launch_description():
         output='screen',
         parameters=[{
             'depth_topic': depth_topic_name,
-        }]
+        }],
+        condition=IfCondition(enable_depth_ema)
+    )
+
+    return [depth_ema_node, yolo_node, groundedsam2_node]
+
+
+def generate_launch_description():
+    image_topic_name_arg = DeclareLaunchArgument(
+        'image_topic_name',
+        default_value='/camera/camera/color/image_raw',
+        description='Image topic name to subscribe to'
+    )
+    image_transport_arg = DeclareLaunchArgument(
+        'image_transport',
+        default_value='raw',
+        description='Image transport type (raw or compressed)'
+    )
+    camera_info_topic_name_arg = DeclareLaunchArgument(
+        'camera_info_topic_name',
+        default_value='/camera/camera/color/camera_info',
+        description='Camera info topic name to subscribe to'
+    )
+    depth_topic_name_arg = DeclareLaunchArgument(
+        'depth_topic_name',
+        default_value='/camera/camera/aligned_depth_to_color/image_raw',
+        description='Depth topic name to subscribe to'
+    )
+    enable_pointcloud_arg = DeclareLaunchArgument(
+        'enable_pointcloud',
+        default_value='true',
+        description='Enable pointcloud generation'
+    )
+    enable_depth_ema_arg = DeclareLaunchArgument(
+        'enable_depth_ema',
+        default_value='true',
+        description='Enable Depth EMA filtering'
+    )
+    search_timeout_arg = DeclareLaunchArgument(
+        'search_timeout',
+        default_value='2.0',
+        description='Timeout for searching objects in seconds'
     )
 
     # turn_on_python_venv = ExecuteProcess(
@@ -97,20 +103,6 @@ def generate_launch_description():
     #     shell=True
     # )
 
-    if enable_depth_ema.perform(None).lower() == 'true':
-        return LaunchDescription([
-            image_topic_name_arg,
-            image_transport_arg,
-            camera_info_topic_name_arg,
-            depth_topic_name_arg,
-            enable_pointcloud_arg,
-            enable_depth_ema_arg,
-            search_timeout_arg,
-
-            depth_ema_node,
-            yolo_node,
-            groundedsam2_node,
-        ])
     return LaunchDescription([
         image_topic_name_arg,
         image_transport_arg,
@@ -119,7 +111,5 @@ def generate_launch_description():
         enable_pointcloud_arg,
         enable_depth_ema_arg,
         search_timeout_arg,
-
-        yolo_node,
-        groundedsam2_node,
+        OpaqueFunction(function=launch_setup),
     ])

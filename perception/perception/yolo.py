@@ -12,7 +12,7 @@ from rclpy.node import Node
 from sensor_msgs.msg import Image, CompressedImage
 from std_msgs.msg import Bool
 from vision_msgs.msg import Detection2D, Detection2DArray, ObjectHypothesisWithPose
-from cv_bridge import CvBridge
+# from cv_bridge import CvBridge
 import cv2
 import numpy as np
 from ultralytics import YOLO
@@ -29,8 +29,8 @@ class YoloNode(Node):
         package_dir = get_package_share_directory(package_name)
 
         # Parameters
-        self.declare_parameter('image_topic', '/camera/camera/color/image_raw/compressed')
-        self.declare_parameter('image_type', 'compressed')  # 'raw' or 'compressed'
+        self.declare_parameter('image_topic', '/camera/camera/color/image_raw')
+        self.declare_parameter('image_type', 'raw')  # 'raw' or 'compressed'
         self.declare_parameter('set_segmentation', False)
         self.declare_parameter('confidence_threshold', 0.5)
 
@@ -42,7 +42,7 @@ class YoloNode(Node):
         # use_open_set=False면 YOLO 활성화, True면 비활성화 (GroundedSAM2가 동작)
         self.use_open_set = False
 
-        self.bridge = CvBridge()
+        # self.bridge = CvBridge()
 
         # Publishers (공통 토픽)
         self.debug_image_pub = self.create_publisher(Image, '/detection_node/debug_image', 10)
@@ -119,17 +119,25 @@ class YoloNode(Node):
     def image_raw_callback(self, msg):
         if self.use_open_set:  # GroundedSAM2 모드면 YOLO는 동작 안함
             return
-        cv_image = self.bridge.imgmsg_to_cv2(msg, 'bgr8')
+        # cv_image = self.bridge.imgmsg_to_cv2(msg, 'bgr8')
+        # self.get_logger().info("Converting raw image message to cv2 format...")
+        cv_image = np.frombuffer(msg.data, dtype=np.uint8).reshape(msg.height, msg.width, -1)
+        cv_image = cv2.cvtColor(cv_image, cv2.COLOR_BGR2RGB)
         self.process(cv_image, msg.header)
 
     def image_compressed_callback(self, msg):
         if self.use_open_set:  # GroundedSAM2 모드면 YOLO는 동작 안함
             return
-        cv_image = self.bridge.compressed_imgmsg_to_cv2(msg, 'bgr8')
+        # cv_image = self.bridge.compressed_imgmsg_to_cv2(msg, 'bgr8')
+        # self.get_logger().info("Converting compressed image message to cv2 format...")
+        np_arr = np.frombuffer(msg.data, dtype=np.uint8)
+        cv_image = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+        cv_image = cv2.cvtColor(cv_image, cv2.COLOR_BGR2RGB)
         self.process(cv_image, msg.header)
 
     
     def process(self, img, header):
+        # self.get_logger().info("Processing image for detection...")
         img_copy = img.copy()
         detections_list = []  # Detection2D 리스트
         
@@ -190,6 +198,7 @@ class YoloNode(Node):
 
     def _create_detection2d(self, x1, y1, x2, y2, label, confidence, header):
         """Create a Detection2D message from bounding box coordinates"""
+        # self.get_logger().info(f"Creating Detection2D: {label} ({confidence:.2f}) at [{x1}, {y1}, {x2}, {y2}]")
         det = Detection2D()
         det.header = header
         
@@ -208,9 +217,17 @@ class YoloNode(Node):
         return det
 
     def publish_output(self, img, detections_list, header):
+        # self.get_logger().info(f"Detections: {len(detections_list)} objects detected.")
         # Publish debug image
-        debug_image = self.bridge.cv2_to_imgmsg(img, 'bgr8')
+        # debug_image = self.bridge.cv2_to_imgmsg(img, 'bgr8')
+        debug_image = Image()
         debug_image.header = header
+        debug_image.height = img.shape[0]
+        debug_image.width = img.shape[1]
+        debug_image.encoding = 'bgr8'
+        debug_image.is_bigendian = 0
+        debug_image.step = img.shape[1] * 3  # width * channels
+        debug_image.data = img.tobytes()
         self.debug_image_pub.publish(debug_image)
         
         # Publish Detection2DArray

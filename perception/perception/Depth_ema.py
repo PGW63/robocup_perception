@@ -11,7 +11,7 @@ Depth EMA Filter Node
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import Image
-from cv_bridge import CvBridge
+# from cv_bridge import CvBridge
 import numpy as np
 
 
@@ -26,7 +26,7 @@ class DepthEMANode(Node):
         depth_topic = self.get_parameter('depth_topic').get_parameter_value().string_value
         self.alpha = self.get_parameter('alpha').get_parameter_value().double_value
         
-        self.bridge = CvBridge()
+        # self.bridge = CvBridge()
         
         # EMA state
         self.depth_ema = None
@@ -55,20 +55,31 @@ class DepthEMANode(Node):
     
     def depth_callback(self, msg):
         """Depth 이미지 콜백 - EMA 필터 적용"""
+        # self.get_logger().info("Get Depth Image")
         try:
             # Convert ROS Image to numpy array
-            depth = self.bridge.imgmsg_to_cv2(msg, desired_encoding='passthrough')
-            
+            # depth = self.bridge.imgmsg_to_cv2(msg, desired_encoding='passthrough')
+            # self.get_logger().info(f"Received depth image: {msg.width}x{msg.height}, encoding={msg.encoding}, step={msg.step}")
+            depth = np.frombuffer(msg.data, dtype=np.uint16).reshape(msg.height, msg.width)
+            # self.get_logger().info(f"Depth array shape: {depth.shape}, min={depth.min()}, max={depth.max()}")
             # Apply EMA filter
             depth_filtered = self.apply_ema(depth)
+            # self.get_logger().info(f"Filtered depth: min={depth_filtered.min()}, max={depth_filtered.max()}")
             
             # Convert back to ROS Image message
-            filtered_msg = self.bridge.cv2_to_imgmsg(
-                depth_filtered.astype(depth.dtype), 
-                encoding='passthrough'
-            )
+            # filtered_msg = self.bridge.cv2_to_imgmsg(
+            #     depth_filtered.astype(depth.dtype), 
+            #     encoding='passthrough'
+            # )
+            filtered_msg = Image()
             filtered_msg.header = msg.header
-            
+            filtered_msg.height = msg.height
+            filtered_msg.width = msg.width
+            filtered_msg.encoding = msg.encoding
+            filtered_msg.is_bigendian = msg.is_bigendian
+            filtered_msg.step = msg.step
+            filtered_msg.data = depth_filtered.astype(np.uint16).tobytes()
+            # self.get_logger().debug("Published filtered depth image")
             # Publish filtered depth image
             self.filtered_depth_pub.publish(filtered_msg)
             
@@ -83,6 +94,7 @@ class DepthEMANode(Node):
         - alpha가 클수록 새로운 값에 민감 (빠른 반응)
         - alpha가 작을수록 이전 값을 더 유지 (부드러운 변화)
         """
+        # self.get_logger().info("Apply EMA")
         if self.depth_ema is None:
             # 첫 프레임은 그대로 사용
             self.depth_ema = depth_new.copy().astype(np.float32)

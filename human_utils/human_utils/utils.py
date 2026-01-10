@@ -18,7 +18,7 @@ from sensor_msgs.msg import Image, CameraInfo
 from std_msgs.msg import ColorRGBA
 from geometry_msgs.msg import Point
 from visualization_msgs.msg import Marker, MarkerArray
-from cv_bridge import CvBridge
+# from cv_bridge import CvBridge
 from ultralytics import YOLO
 import tf2_ros
 from tf2_ros import TransformBroadcaster

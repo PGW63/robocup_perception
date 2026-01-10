@@ -21,7 +21,7 @@ from rclpy.node import Node
 from sensor_msgs.msg import Image, CompressedImage, CameraInfo, PointCloud2, PointField
 from std_msgs.msg import String, Bool, Header
 from vision_msgs.msg import Detection2D, Detection2DArray, ObjectHypothesisWithPose
-from cv_bridge import CvBridge
+# from cv_bridge import CvBridge
 import message_filters
 import cv2
 import numpy as np
@@ -36,7 +36,7 @@ import json
 from rcl_interfaces.msg import SetParametersResult
 
 # Grounded-SAM-2 패키지 경로 추가
-GROUNDED_SAM2_PATH = os.path.expanduser("~/vision_ws/src/Grounded-SAM-2")
+GROUNDED_SAM2_PATH = os.path.expanduser("/home/ubuntu/vision_ws/src/Grounded-SAM-2")
 if GROUNDED_SAM2_PATH not in sys.path:
     sys.path.insert(0, GROUNDED_SAM2_PATH)
 
@@ -77,20 +77,20 @@ class GroundedSAM2Node(Node):
         super().__init__('grounded_sam2_node')
         
         # ==================== Parameters ====================
-        self.declare_parameter('image_topic', '/camera/camera/color/image_raw/compressed')
-        self.declare_parameter('image_type', 'compressed')  # 'raw' or 'compressed'
+        self.declare_parameter('image_topic', '/camera/camera/color/image_raw')
+        self.declare_parameter('image_type', 'raw')  # 'raw' or 'compressed'
         self.declare_parameter('search_timeout', 2.0)  # 탐색 타임아웃 (초)
         self.declare_parameter('box_threshold', 0.35)
         self.declare_parameter('text_threshold', 0.25)
         # 모델 경로 (Grounded-SAM-2 패키지 기준 상대 경로)
         self.declare_parameter('gdino_config', 'grounding_dino/groundingdino/config/GroundingDINO_SwinT_OGC.py')
         self.declare_parameter('gdino_checkpoint', 'gdino_checkpoints/groundingdino_swint_ogc.pth')
-        self.declare_parameter('sam2_config', 'configs/sam2.1/sam2.1_hiera_b+.yaml')  # SAM2 Hydra config 상대 경로
-        self.declare_parameter('sam2_checkpoint', 'checkpoints/sam2.1_hiera_base_plus.pt')
+        self.declare_parameter('sam2_config', 'configs/sam2.1/sam2.1_hiera_t.yaml')  # SAM2 Hydra config 상대 경로
+        self.declare_parameter('sam2_checkpoint', 'checkpoints/sam2.1_hiera_tiny.pt')
         
         # PointCloud 관련 파라미터
         self.declare_parameter('filtered_depth_topic', '/detection_node/filtered_depth_image')
-        self.declare_parameter('camera_info_topic', '/camera/camera/aligned_depth_to_color/camera_info')
+        self.declare_parameter('camera_info_topic', '/camera/camera/depth/aligned_depth_to_color/camera_info')
         self.declare_parameter('enable_pointcloud', True)  # 포인트클라우드 생성 활성화
         self.declare_parameter('min_depth', 0.1)  # 최소 depth (m)
         self.declare_parameter('max_depth', 2.0)  # 최대 depth (m)
@@ -115,7 +115,7 @@ class GroundedSAM2Node(Node):
         self.state = self.STATE_IDLE
         self.text_prompt = ""  # GroundingDINO 프롬프트 (예: "red apple. green bottle.")
         self.search_start_time = None
-        self.bridge = CvBridge()
+        # self.bridge = CvBridge()
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         
         # use_open_set=True면 GroundedSAM2 활성화, False면 비활성화 (YOLO가 동작)
@@ -325,7 +325,8 @@ class GroundedSAM2Node(Node):
     def filtered_depth_callback(self, msg: Image):
         """필터링된 depth 이미지 수신"""
         try:
-            self.latest_filtered_depth = self.bridge.imgmsg_to_cv2(msg, desired_encoding='passthrough')
+            # self.latest_filtered_depth = self.bridge.imgmsg_to_cv2(msg, desired_encoding='passthrough')
+            self.latest_filtered_depth = np.frombuffer(msg.data, dtype=np.uint16).reshape(msg.height, msg.width)
             self.latest_depth_header = msg.header
         except Exception as e:
             self.get_logger().warn(f"Failed to convert depth image: {e}")
@@ -401,13 +402,20 @@ class GroundedSAM2Node(Node):
     def image_raw_callback(self, msg: Image):
         if not self.use_open_set or self.state == self.STATE_IDLE:
             return
-        cv_image = self.bridge.imgmsg_to_cv2(msg, 'bgr8')
+        # cv_image = self.bridge.imgmsg_to_cv2(msg, 'bgr8')
+        cv_image = np.frombuffer(msg.data, dtype=np.uint8).reshape(msg.height, msg.width, -1)
+        # BGR -> RGB 변환 (ROS Image는 BGR로 들어옴)
+        cv_image = cv2.cvtColor(cv_image, cv2.COLOR_BGR2RGB)
         self.process(cv_image, msg.header)
     
     def image_compressed_callback(self, msg: CompressedImage):
         if not self.use_open_set or self.state == self.STATE_IDLE:
             return
-        cv_image = self.bridge.compressed_imgmsg_to_cv2(msg, 'bgr8')
+        # cv_image = self.bridge.compressed_imgmsg_to_cv2(msg, 'bgr8')
+        np_arr = np.frombuffer(msg.data, dtype=np.uint8)
+        cv_image = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+        # BGR -> RGB 변환 (cv2.imdecode는 BGR로 디코딩)
+        cv_image = cv2.cvtColor(cv_image, cv2.COLOR_BGR2RGB)
         self.process(cv_image, msg.header)
     
     def check_timeout(self):
@@ -460,30 +468,29 @@ class GroundedSAM2Node(Node):
     
     # ==================== Processing ====================
     
-    def process(self, img_bgr: np.ndarray, header):
-        """메인 처리 함수"""
+    def process(self, img_rgb: np.ndarray, header):
+        """메인 처리 함수 (입력: RGB 이미지)"""
         if self.state == self.STATE_SEARCHING:
-            self._process_search(img_bgr, header)
+            self._process_search(img_rgb, header)
         elif self.state == self.STATE_TRACKING:
-            self._process_tracking(img_bgr, header)
+            self._process_tracking(img_rgb, header)
     
-    def _process_search(self, img_bgr: np.ndarray, header):
-        """GroundingDINO로 객체 탐색"""
+    def _process_search(self, img_rgb: np.ndarray, header):
+        """GroundingDINO로 객체 탐색 (입력: RGB 이미지)"""
         if self.gdino_model is None:
             self.get_logger().error("GroundingDINO not loaded")
             return
         
-        img_copy = img_bgr.copy()
+        img_copy = img_rgb.copy()
         
         if not self.text_prompt:
             self._publish_empty_detection(img_copy, header)
             return
         
-        H, W = img_bgr.shape[:2]
+        H, W = img_rgb.shape[:2]
         
         try:
-            # OpenCV BGR -> PIL RGB -> Transform
-            img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
+            # RGB 이미지를 PIL로 변환 -> Transform
             pil_img = PILImage.fromarray(img_rgb)
             img_transformed, _ = self.gdino_transform(pil_img, None)
             
@@ -509,7 +516,7 @@ class GroundedSAM2Node(Node):
                 
                 # SAM2로 마스크 생성 및 트래킹 전환
                 if self.sam2_predictor is not None:
-                    self._init_tracking_with_sam2(img_bgr, boxes_xyxy, phrases, scores_np)
+                    self._init_tracking_with_sam2(img_rgb, boxes_xyxy, phrases, scores_np)
                 else:
                     self._init_tracking_bbox_only(boxes_xyxy, phrases, scores_np)
                 
@@ -530,10 +537,9 @@ class GroundedSAM2Node(Node):
             traceback.print_exc()
             self._publish_empty_detection(img_copy, header)
     
-    def _init_tracking_with_sam2(self, img_bgr, boxes_np, labels, scores_np):
-        """SAM2로 마스크 생성 및 트래킹 초기화"""
+    def _init_tracking_with_sam2(self, img_rgb, boxes_np, labels, scores_np):
+        """SAM2로 마스크 생성 및 트래킹 초기화 (입력: RGB 이미지)"""
         try:
-            img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
             self.sam2_predictor.set_image(img_rgb)
             
             # SAM2 마스크 예측
@@ -569,8 +575,8 @@ class GroundedSAM2Node(Node):
         self.tracking_scores = scores_np.tolist() if hasattr(scores_np, 'tolist') else list(scores_np)
         self.get_logger().info(f"BBox-only tracking initialized with {len(boxes_np)} boxes")
     
-    def _process_tracking(self, img_bgr: np.ndarray, header):
-        """SAM2로 객체 트래킹"""
+    def _process_tracking(self, img_rgb: np.ndarray, header):
+        """SAM2로 객체 트래킹 (입력: RGB 이미지)"""
         if self.tracking_boxes is None or len(self.tracking_boxes) == 0:
             self.get_logger().warn("No tracking target, returning to IDLE")
             self._reset_state()
@@ -578,12 +584,11 @@ class GroundedSAM2Node(Node):
             self.use_open_set = False
             return
         
-        img_copy = img_bgr.copy()
+        img_copy = img_rgb.copy()
         
         # SAM2가 있으면 마스크 트래킹
         if self.sam2_predictor is not None and self.tracking_masks is not None:
             try:
-                img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
                 self.sam2_predictor.set_image(img_rgb)
                 
                 # 이전 박스를 사용해서 새 마스크 예측
@@ -703,8 +708,17 @@ class GroundedSAM2Node(Node):
                 detections_list.append(det)
         
         # Publish debug image (세그멘테이션 + bbox 통합)
-        debug_msg = self.bridge.cv2_to_imgmsg(img_copy, 'bgr8')
+        # RGB -> BGR 변환 후 퍼블리시
+        img_bgr = cv2.cvtColor(img_copy, cv2.COLOR_RGB2BGR)
+        # debug_msg = self.bridge.cv2_to_imgmsg(img_bgr, 'bgr8')
+        debug_msg = Image()
         debug_msg.header = header
+        debug_msg.height = img_bgr.shape[0]
+        debug_msg.width = img_bgr.shape[1]
+        debug_msg.encoding = 'bgr8'
+        debug_msg.is_bigendian = 0
+        debug_msg.step = img_bgr.shape[1] * 3
+        debug_msg.data = img_bgr.tobytes()
         self.debug_image_pub.publish(debug_msg)
         
         # Publish Detection2DArray
@@ -888,9 +902,18 @@ class GroundedSAM2Node(Node):
         return pc_msg
     
     def _publish_empty_detection(self, img_copy: np.ndarray, header):
-        """빈 detection 퍼블리시"""
-        debug_msg = self.bridge.cv2_to_imgmsg(img_copy, 'bgr8')
+        """빈 detection 퍼블리시 (입력: RGB 이미지)"""
+        # RGB -> BGR 변환 후 퍼블리시
+        img_bgr = cv2.cvtColor(img_copy, cv2.COLOR_RGB2BGR)
+        # debug_msg = self.bridge.cv2_to_imgmsg(img_bgr, 'bgr8')
+        debug_msg = Image()
         debug_msg.header = header
+        debug_msg.height = img_bgr.shape[0]
+        debug_msg.width = img_bgr.shape[1]
+        debug_msg.encoding = 'bgr8'
+        debug_msg.is_bigendian = 0
+        debug_msg.step = img_bgr.shape[1] * 3
+        debug_msg.data = img_bgr.tobytes()
         self.debug_image_pub.publish(debug_msg)
         
         det_array = Detection2DArray()

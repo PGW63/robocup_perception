@@ -18,7 +18,7 @@ from sensor_msgs.msg import Image, CameraInfo
 from std_msgs.msg import String, ColorRGBA, Bool
 from geometry_msgs.msg import Point
 from visualization_msgs.msg import Marker, MarkerArray
-from cv_bridge import CvBridge
+# from cv_bridge import CvBridge
 from ultralytics import YOLO
 import tf2_ros
 from tf2_ros import TransformBroadcaster
@@ -281,7 +281,7 @@ class HumanStateDetectorNode(Node):
         )
         
         # CvBridge
-        self.bridge = CvBridge()
+        # self.bridge = CvBridge()
         
         # YOLO 모델 로드
         model_name = self.get_parameter("yolo_model").value
@@ -336,7 +336,8 @@ class HumanStateDetectorNode(Node):
     def on_depth(self, msg: Image):
         """뎁스 이미지 수신"""
         try:
-            self.depth_image = self.bridge.imgmsg_to_cv2(msg, desired_encoding="passthrough")
+            self.depth_image = np.frombuffer(msg.data, dtype=np.uint16 if msg.encoding == "16UC1" else np.float32).reshape((msg.height, msg.width))
+            # self.depth_image = self.bridge.imgmsg_to_cv2(msg, desired_encoding="passthrough")
         except Exception as e:
             self.get_logger().warn(f"Depth conversion failed: {e}")
     
@@ -533,7 +534,8 @@ class HumanStateDetectorNode(Node):
         
         
         try:
-            bgr = self.bridge.imgmsg_to_cv2(msg, desired_encoding="bgr8")
+            bgr = np.frombuffer(msg.data, dtype=np.uint8).reshape((msg.height, msg.width, -1))
+            # bgr = self.bridge.imgmsg_to_cv2(msg, desired_encoding="bgr8")
         except Exception as e:
             self.get_logger().warn(f"Image conversion failed: {e}")
             return
@@ -543,7 +545,10 @@ class HumanStateDetectorNode(Node):
         
         if len(results) == 0 or results[0].keypoints is None:
             # 사람 없으면 원본 이미지 발행
-            debug_msg = self.bridge.cv2_to_imgmsg(bgr, encoding="bgr8")
+            
+            # debug_msg = self.bridge.cv2_to_imgmsg(bgr, encoding="bgr8")
+            debug_msg = Image()
+            debug_msg.data = bgr.tobytes()
             debug_msg.header = msg.header
             self.pub_debug.publish(debug_msg)
             return
@@ -590,7 +595,9 @@ class HumanStateDetectorNode(Node):
             self.pub_markers.publish(all_markers)
         
         # 디버그 이미지 발행
-        debug_msg = self.bridge.cv2_to_imgmsg(annotated, encoding="bgr8")
+        #debug_msg = self.bridge.cv2_to_imgmsg(annotated, encoding="bgr8")
+        debug_msg = Image()
+        debug_msg.data = annotated.tobytes()
         debug_msg.header = msg.header
         self.pub_debug.publish(debug_msg)
 
