@@ -1,5 +1,39 @@
 # inha_perception
 
+## perception - Detection
+Node
+- YOLO node
+- Grounded SAM2 node
+- Depth EMA node
+
+### YOLO node
+Topic
+subscription
+- /camera/camera/color/image_raw/compressed (Image) 
+- /detection_node/use_open_set (Bool) : True일시 Grounded SAM2 노드가 활성화되고 False이면 YOLO 노드가 활성화
+
+publisher
+- /detection_node/debug_image (Image) : 디버깅용 이미지 
+- /detection_node/detections (Detection2DArray of vision_msgs) : 현재 이미지에서 디텍션된 물체들을 배열로 넘겨줌
+
+### Grounded SAM2 node
+Topic 
+subscription
+- /camera/camera/color/image_raw/compressed (Image)
+- /camera/camera/aligned_depth_to_color/camera_info (CameraInfo)
+- /detection_node/filtered_depth_image (Image) : 카메라 뎁스를 필터링해서 안정화 시킨 이미지
+- /detection_node/use_open_set (Bool) : GroundedSAM2 node를 사용할지 YOLO node를 사용할지
+- /detection_node/search (String) : openSet Detection을 위해 찾을 물체들 (입력예시: coke. banana. green apple. ) - GroundingDino에서 제안하는 프롬프팅
+- /detection_node/stop (Bool) : 한번 찾으면 SAM2로 트래킹을 쭉 하는데, 트래킹을 끊기 위한 트리거
+
+publisher
+- /detection_node/status (String) : 현재 디텍션 상태 (IDLE, SEARCHING, TRACKING)
+- /detection_node/use_open_set (Bool) : 이전과 동일
+- /detection_node/debug_image (Image) : 디버깅용 이미지
+- /detection_node/detections (Detection2DArray of vision_msgs) : 이전과 동일
+- /detection_node/segmented_pointcloud (PointCloud2) : 찾은 물체에 대해서 포인트클라우드로 발행
+- /detection_node/object_info (String) : 
+
 ## human utils - Pose Detection
 
 ### humamn state detection
