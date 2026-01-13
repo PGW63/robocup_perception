@@ -32,7 +32,52 @@ publisher
 - /detection_node/debug_image (Image) : 디버깅용 이미지
 - /detection_node/detections (Detection2DArray of vision_msgs) : 이전과 동일
 - /detection_node/segmented_pointcloud (PointCloud2) : 찾은 물체에 대해서 포인트클라우드로 발행
-- /detection_node/object_info (String) : 
+- /detection_node/object_info (String) : detection 토픽과는 다르게 3차원 정보에 대한 토픽
+
+### Depth EMA node
+Topic
+subscription
+- /camera/camera/aligned_depth_to_color/image_raw (Image)
+
+publisher
+- /detection_node/filtered_depth (Image) : 필터를 거친 뎁스이미지
+
+### /detection_node/detections 예시
+```
+header:
+  stamp:
+    sec: 1710000000
+    nanosec: 123456789
+  frame_id: "camera_color_frame"
+detections:
+- bbox:
+    center:
+      position: {x: 320.0, y: 240.0}
+      theta: 0.0
+    size_x: 120.0
+    size_y: 80.0
+  results:
+  - hypothesis:
+      class_id: "apple"
+      score: 0.92
+```
+
+### /detection_node/object_info 예시
+```
+[
+  {
+    "id": 1,
+    "class": "apple",
+    "confidence": 0.92,
+    "num_points": 1543,
+    "centroid": {
+      "x": 0.42,
+      "y": -0.08,
+      "z": 0.73
+    }
+  }
+]
+```
 
 ## human utils - Pose Detection
 
@@ -60,13 +105,13 @@ publisher
 
 topic example
 - /human/states
-  '''
+  ```
   data: P0:STANDING, P1:UNKNOWN
-  '''
+  ```
 - /human/skeleton_markers
-  '''
+  ```
   ./topic_example.txt
-  '''
+  ```
 
 
 To Be modifed
