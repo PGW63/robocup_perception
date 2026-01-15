@@ -14,26 +14,21 @@ from typing import Dict, List, Optional, Tuple
 import rclpy
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
-from sensor_msgs.msg import Image, CameraInfo
-from std_msgs.msg import String, ColorRGBA, Bool
+from sensor_msgs.msg import Image, CameraInfo, CompressedImage
+from std_msgs.msg import String, ColorRGBA, Bool, Float32MultiArray
 from geometry_msgs.msg import Point
 from visualization_msgs.msg import Marker, MarkerArray
-# from cv_bridge import CvBridge
 from ultralytics import YOLO
 import tf2_ros
 from tf2_ros import TransformBroadcaster
+import message_filters
 
-# human_state_3d에서 가져오기
 from human_utils.utils import (
     Point3D, Skeleton3D, KeypointIndex, SKELETON_CONNECTIONS,
     angle_3d, angle_3d_on_plane, distance_3d, vector_3d, midpoint_3d,
     JointAngleCalculator
 )
 
-
-# ============================================================
-# Human State Enum
-# ============================================================
 class HumanState(Enum):
     UNKNOWN = auto()
     STANDING = auto()      # 서있기
@@ -43,8 +38,6 @@ class HumanState(Enum):
     HAND_UP_RIGHT = auto() # 오른손 들기
     HAND_UP_BOTH = auto()  # 양손 들기
 
-
-# 상태별 색상 (BGR)
 STATE_COLORS = {
     HumanState.UNKNOWN: (128, 128, 128),      # 회색
     HumanState.STANDING: (0, 255, 0),         # 초록
@@ -55,10 +48,6 @@ STATE_COLORS = {
     HumanState.HAND_UP_BOTH: (0, 0, 255),     # 빨강
 }
 
-
-# ============================================================
-# Rule-based 상태 판별기
-# ============================================================
 class HumanStateDetector:
     """Rule-based 기하학으로 사람 상태 판별"""
     
@@ -92,17 +81,17 @@ class HumanStateDetector:
         if hand_state:
             return hand_state, angles
         
-        # 2. 누워있기 체크
-        if self._is_lying_down(skeleton, angles):
-            return HumanState.LYING_DOWN, angles
+        # 2. 누워있기 체크 (주석처리)
+        # if self._is_lying_down(skeleton, angles):
+        #     return HumanState.LYING_DOWN, angles
         
-        # 3. 앉아있기 체크
-        if self._is_sitting(skeleton, angles):
-            return HumanState.SITTING, angles
+        # 3. 앉아있기 체크 (주석처리)
+        # if self._is_sitting(skeleton, angles):
+        #     return HumanState.SITTING, angles
         
-        # 4. 서있기 체크
-        if self._is_standing(skeleton, angles):
-            return HumanState.STANDING, angles
+        # 4. 서있기 체크 (주석처리)
+        # if self._is_standing(skeleton, angles):
+        #     return HumanState.STANDING, angles
         
         return HumanState.UNKNOWN, angles
     
@@ -149,97 +138,98 @@ class HumanStateDetector:
         
         return wrist_above_shoulder
     
-    def _is_lying_down(self, skel: Skeleton3D, angles: Dict) -> bool:
-        """누워있는 자세 감지"""
-        # 어깨와 엉덩이가 필요
-        if not (skel.has_point(KeypointIndex.LEFT_SHOULDER) and 
-                skel.has_point(KeypointIndex.LEFT_HIP)):
-            if not (skel.has_point(KeypointIndex.RIGHT_SHOULDER) and 
-                    skel.has_point(KeypointIndex.RIGHT_HIP)):
-                return False
-        
-        # 왼쪽 또는 오른쪽 어깨-엉덩이 사용
-        if skel.has_point(KeypointIndex.LEFT_SHOULDER) and skel.has_point(KeypointIndex.LEFT_HIP):
-            shoulder = skel.keypoints[KeypointIndex.LEFT_SHOULDER]
-            hip = skel.keypoints[KeypointIndex.LEFT_HIP]
-        else:
-            shoulder = skel.keypoints[KeypointIndex.RIGHT_SHOULDER]
-            hip = skel.keypoints[KeypointIndex.RIGHT_HIP]
-        
-        # 몸통 벡터 (엉덩이 → 어깨)
-        torso_vec = vector_3d(hip, shoulder)
-        
-        # 수직 벡터 (카메라 좌표계에서 -Y가 위)
-        vertical = np.array([0, -1, 0])
-        
-        # 몸통과 수직의 각도
-        torso_norm = np.linalg.norm(torso_vec)
-        if torso_norm < 1e-6:
-            return False
-        
-        cos_angle = np.dot(torso_vec / torso_norm, vertical)
-        torso_angle_from_vertical = np.degrees(np.arccos(np.clip(np.abs(cos_angle), 0, 1)))
-        
-        # 수직에서 45도 이상 벗어나면 (수평에 가까우면) 누워있음
-        return torso_angle_from_vertical > (90 - self.lying_torso_horizontal_threshold)
+    # === 아래 함수들 주석처리 ===
+    # def _is_lying_down(self, skel: Skeleton3D, angles: Dict) -> bool:
+    #     """누워있는 자세 감지"""
+    #     # 어깨와 엉덩이가 필요
+    #     if not (skel.has_point(KeypointIndex.LEFT_SHOULDER) and 
+    #             skel.has_point(KeypointIndex.LEFT_HIP)):
+    #         if not (skel.has_point(KeypointIndex.RIGHT_SHOULDER) and 
+    #                 skel.has_point(KeypointIndex.RIGHT_HIP)):
+    #             return False
+    #     
+    #     # 왼쪽 또는 오른쪽 어깨-엉덩이 사용
+    #     if skel.has_point(KeypointIndex.LEFT_SHOULDER) and skel.has_point(KeypointIndex.LEFT_HIP):
+    #         shoulder = skel.keypoints[KeypointIndex.LEFT_SHOULDER]
+    #         hip = skel.keypoints[KeypointIndex.LEFT_HIP]
+    #     else:
+    #         shoulder = skel.keypoints[KeypointIndex.RIGHT_SHOULDER]
+    #         hip = skel.keypoints[KeypointIndex.RIGHT_HIP]
+    #     
+    #     # 몸통 벡터 (엉덩이 → 어깨)
+    #     torso_vec = vector_3d(hip, shoulder)
+    #     
+    #     # 수직 벡터 (카메라 좌표계에서 -Y가 위)
+    #     vertical = np.array([0, -1, 0])
+    #     
+    #     # 몸통과 수직의 각도
+    #     torso_norm = np.linalg.norm(torso_vec)
+    #     if torso_norm < 1e-6:
+    #         return False
+    #     
+    #     cos_angle = np.dot(torso_vec / torso_norm, vertical)
+    #     torso_angle_from_vertical = np.degrees(np.arccos(np.clip(np.abs(cos_angle), 0, 1)))
+    #     
+    #     # 수직에서 45도 이상 벗어나면 (수평에 가까우면) 누워있음
+    #     return torso_angle_from_vertical > (90 - self.lying_torso_horizontal_threshold)
     
-    def _is_sitting(self, skel: Skeleton3D, angles: Dict) -> bool:
-        """앉아있는 자세 감지"""
-        # 무릎 각도 체크
-        left_knee = angles.get("left_knee")
-        right_knee = angles.get("right_knee")
-        
-        # 엉덩이 각도 체크
-        left_hip = angles.get("left_hip")
-        right_hip = angles.get("right_hip")
-        
-        # 무릎이 구부러져 있고 엉덩이도 구부러져 있으면 앉음
-        knee_bent = False
-        hip_bent = False
-        
-        if left_knee is not None and left_knee < self.sitting_knee_angle_max:
-            knee_bent = True
-        if right_knee is not None and right_knee < self.sitting_knee_angle_max:
-            knee_bent = True
-        
-        if left_hip is not None and left_hip < self.sitting_hip_angle_max:
-            hip_bent = True
-        if right_hip is not None and right_hip < self.sitting_hip_angle_max:
-            hip_bent = True
-        
-        return knee_bent and hip_bent
+    # def _is_sitting(self, skel: Skeleton3D, angles: Dict) -> bool:
+    #     """앉아있는 자세 감지"""
+    #     # 무릎 각도 체크
+    #     left_knee = angles.get("left_knee")
+    #     right_knee = angles.get("right_knee")
+    #     
+    #     # 엉덩이 각도 체크
+    #     left_hip = angles.get("left_hip")
+    #     right_hip = angles.get("right_hip")
+    #     
+    #     # 무릎이 구부러져 있고 엉덩이도 구부러져 있으면 앉음
+    #     knee_bent = False
+    #     hip_bent = False
+    #     
+    #     if left_knee is not None and left_knee < self.sitting_knee_angle_max:
+    #         knee_bent = True
+    #     if right_knee is not None and right_knee < self.sitting_knee_angle_max:
+    #         knee_bent = True
+    #     
+    #     if left_hip is not None and left_hip < self.sitting_hip_angle_max:
+    #         hip_bent = True
+    #     if right_hip is not None and right_hip < self.sitting_hip_angle_max:
+    #         hip_bent = True
+    #     
+    #     return knee_bent and hip_bent
     
-    def _is_standing(self, skel: Skeleton3D, angles: Dict) -> bool:
-        """서있는 자세 감지"""
-        # 무릎 각도 체크
-        left_knee = angles.get("left_knee")
-        right_knee = angles.get("right_knee")
-        
-        # 엉덩이 각도 체크
-        left_hip = angles.get("left_hip")
-        right_hip = angles.get("right_hip")
-        
-        # 무릎이 펴져 있고 엉덩이도 펴져 있으면 서있음
-        knee_straight = False
-        hip_straight = False
-        
-        if left_knee is not None and left_knee >= self.standing_knee_angle_min:
-            knee_straight = True
-        if right_knee is not None and right_knee >= self.standing_knee_angle_min:
-            knee_straight = True
-        
-        if left_hip is not None and left_hip >= self.standing_hip_angle_min:
-            hip_straight = True
-        if right_hip is not None and right_hip >= self.standing_hip_angle_min:
-            hip_straight = True
-        
-        # 둘 다 정보가 없으면 서있다고 가정
-        if left_knee is None and right_knee is None:
-            knee_straight = True
-        if left_hip is None and right_hip is None:
-            hip_straight = True
-        
-        return knee_straight and hip_straight
+    # def _is_standing(self, skel: Skeleton3D, angles: Dict) -> bool:
+    #     """서있는 자세 감지"""
+    #     # 무릎 각도 체크
+    #     left_knee = angles.get("left_knee")
+    #     right_knee = angles.get("right_knee")
+    #     
+    #     # 엉덩이 각도 체크
+    #     left_hip = angles.get("left_hip")
+    #     right_hip = angles.get("right_hip")
+    #     
+    #     # 무릎이 펴져 있고 엉덩이도 펴져 있으면 서있음
+    #     knee_straight = False
+    #     hip_straight = False
+    #     
+    #     if left_knee is not None and left_knee >= self.standing_knee_angle_min:
+    #         knee_straight = True
+    #     if right_knee is not None and right_knee >= self.standing_knee_angle_min:
+    #         knee_straight = True
+    #     
+    #     if left_hip is not None and left_hip >= self.standing_hip_angle_min:
+    #         hip_straight = True
+    #     if right_hip is not None and right_hip >= self.standing_hip_angle_min:
+    #         hip_straight = True
+    #     
+    #     # 둘 다 정보가 없으면 서있다고 가정
+    #     if left_knee is None and right_knee is None:
+    #         knee_straight = True
+    #     if left_hip is None and right_hip is None:
+    #         hip_straight = True
+    #     
+    #     return knee_straight and hip_straight
 
 
 # ============================================================
@@ -250,7 +240,7 @@ class HumanStateDetectorNode(Node):
         super().__init__('human_state_detector_node')
         
         # 파라미터 선언
-        self.declare_parameter("image_topic", "/camera/camera/color/image_raw")
+        self.declare_parameter("image_topic", "/camera/camera/color/image_raw/compressed")
         self.declare_parameter("camera_info_topic", "/camera/camera/color/camera_info")
         self.declare_parameter("depth_topic", "/camera/camera/aligned_depth_to_color/image_raw")
         self.declare_parameter("camera_frame", "camera_color_optical_frame")
@@ -262,6 +252,7 @@ class HumanStateDetectorNode(Node):
         
         self.declare_parameter("publish_markers", True)
         self.declare_parameter("min_keypoint_conf", 0.3)
+        self.declare_parameter("min_detection_frames", 5)  # 최소 연속 감지 프레임 수
         
         # 파라미터 로드
         self.image_topic = self.get_parameter("image_topic").value
@@ -272,10 +263,21 @@ class HumanStateDetectorNode(Node):
         
         self.publish_markers = self.get_parameter("publish_markers").value
         self.min_keypoint_conf = self.get_parameter("min_keypoint_conf").value
+        self.min_detection_frames = self.get_parameter("min_detection_frames").value
         
-        # QoS 설정
-        qos = QoSProfile(
+        # 강건성 검증 - hand up 감지 카운터
+        self.hand_up_counter = 0
+        self.hand_up_detected = False
+        
+        # QoS 설정 (이미지는 Reliable 사용)
+        qos_best_effort = QoSProfile(
             reliability=ReliabilityPolicy.BEST_EFFORT,
+            history=HistoryPolicy.KEEP_LAST,
+            depth=5,
+        )
+        
+        qos_reliable = QoSProfile(
+            reliability=ReliabilityPolicy.RELIABLE,
             history=HistoryPolicy.KEEP_LAST,
             depth=5,
         )
@@ -307,23 +309,38 @@ class HumanStateDetectorNode(Node):
         
         # 상태 감지기
         self.state_detector = HumanStateDetector()
-        
-        # 구독자
-        self.sub_img = self.create_subscription(Image, self.image_topic, self.on_image, qos)
-        self.sub_info = self.create_subscription(CameraInfo, self.camera_info_topic, self.on_camera_info, 10)
-        self.sub_depth = self.create_subscription(Image, self.depth_topic, self.on_depth, qos)
 
+        # self.sub_img_compressed = self.create_subscription(CompressedImage, self.image_topic, self.on_image_compresse, qos_reliable)
+        self.sub_info = self.create_subscription(CameraInfo, self.camera_info_topic, self.on_camera_info, 10)
+
+        self.image_sub = message_filters.Subscriber(self, CompressedImage, self.image_topic, qos_profile=qos_best_effort)
+        self.depth_sub = message_filters.Subscriber(self, Image, self.depth_topic, qos_profile=qos_best_effort)
+
+        self.ats = message_filters.ApproximateTimeSynchronizer([self.image_sub, self.depth_sub], queue_size=10, slop=0.1)
+        self.ats.registerCallback(self.synchronized_callback)
         # self.stop_flag 변경
         self.sub_flag = self.create_subscription(Bool, "/human/resume", self.flag_callback, 10)
         
-        # 발행자
-        self.pub_state = self.create_publisher(String, "/human/states", 10)
-        self.pub_markers = self.create_publisher(MarkerArray, "/human/skeleton_markers", 10)
-        self.pub_debug = self.create_publisher(Image, "/human/debug_image", 10)
+        # 발행자 (Reliable QoS로 통일)
+        self.pub_state = self.create_publisher(String, "/human/states", qos_reliable)
+        self.pub_markers = self.create_publisher(MarkerArray, "/human/skeleton_markers", qos_reliable)
+        self.pub_debug = self.create_publisher(Image, "/human/debug_image", qos_best_effort)
+        self.pub_hand_up = self.create_publisher(Bool, "/human/hand_up_detected", 10)
+        self.pub_hand_up_bbox = self.create_publisher(Float32MultiArray, "/human/hand_up_bbox", 10)
         
         self.get_logger().info(f"Human State Detector Node initialized")
         self.get_logger().info(f"  Image: {self.image_topic}")
         self.get_logger().info(f"  Camera frame: {self.camera_frame}")
+
+        self.get_logger().debug("Log level set to DEBUG for detailed tracing.")
+    
+    def flag_callback(self, msg: Bool):
+        """stop_flag 업데이트"""
+        self.stop_flag = not msg.data
+        if self.stop_flag:
+            self.get_logger().info("⏸️ Human state detection paused")
+        else:
+            self.get_logger().info("▶️ Human state detection resumed")
     
     def on_camera_info(self, msg: CameraInfo):
         """카메라 내부 파라미터 수신"""
@@ -331,22 +348,6 @@ class HumanStateDetectorNode(Node):
         self.dist_coeffs = np.array(msg.d)
         self.destroy_subscription(self.sub_info)
         self.get_logger().info("Camera info received and camera matrix set.")
-        
-    
-    def on_depth(self, msg: Image):
-        """뎁스 이미지 수신"""
-        try:
-            self.depth_image = np.frombuffer(msg.data, dtype=np.uint16 if msg.encoding == "16UC1" else np.float32).reshape((msg.height, msg.width))
-            # self.depth_image = self.bridge.imgmsg_to_cv2(msg, desired_encoding="passthrough")
-        except Exception as e:
-            self.get_logger().warn(f"Depth conversion failed: {e}")
-    
-    def flag_callback(self, msg: Bool):
-        if self.stop_flag != msg.data:
-            rclpy.logging.get_logger("HumanStateDetectorNode").info(f"Setting stop_flag to {msg.data}")
-        self.stop_flag = msg.data
-
-
     
     def pixel_to_3d(self, u: int, v: int, depth_m: float) -> Optional[Point3D]:
         """2D 픽셀 좌표 + 깊이 → 3D 좌표"""
@@ -527,29 +528,51 @@ class HumanStateDetectorNode(Node):
         
         return markers
     
-    def on_image(self, msg: Image):
+    def synchronized_callback(self, image_msg: CompressedImage, depth_msg: Image):
         """이미지 콜백"""
+        # self.get_logger().debug("🔵 on_image called - 콜백 함수 실행됨!")
+        
         if self.stop_flag:
+            self.get_logger().info("⏸️ Processing is paused due to stop_flag.")
             return
         
         
         try:
-            bgr = np.frombuffer(msg.data, dtype=np.uint8).reshape((msg.height, msg.width, -1))
-            # bgr = self.bridge.imgmsg_to_cv2(msg, desired_encoding="bgr8")
+            self.bgr = cv2.imdecode(np.frombuffer(image_msg.data, dtype=np.uint8), cv2.IMREAD_COLOR)
+            self.rgb = cv2.cvtColor(self.bgr, cv2.COLOR_BGR2RGB)
         except Exception as e:
             self.get_logger().warn(f"Image conversion failed: {e}")
             return
+
+        # Depth 이미지 변환 (encoding 확인)
+        try:
+            if depth_msg.encoding == '16UC1':
+                self.depth_image = np.frombuffer(depth_msg.data, dtype=np.uint16).reshape((depth_msg.height, depth_msg.width))
+            elif depth_msg.encoding == '32FC1':
+                self.depth_image = np.frombuffer(depth_msg.data, dtype=np.float32).reshape((depth_msg.height, depth_msg.width))
+                # float 타입은 이미 미터 단위이므로, uint16으로 변환 (mm 단위로)
+                self.depth_image = (self.depth_image * 1000.0).astype(np.uint16)
+            else:
+                self.get_logger().warn(f"Unsupported depth encoding: {depth_msg.encoding}")
+                return
+        except Exception as e:
+            self.get_logger().warn(f"Depth image conversion failed: {e}")
+            return
         
         # YOLO 추론
-        results = self.model(bgr, conf=self.yolo_conf, verbose=False)
+        results = self.model(self.rgb, conf=self.yolo_conf, verbose=False)
         
         if len(results) == 0 or results[0].keypoints is None:
             # 사람 없으면 원본 이미지 발행
             
             # debug_msg = self.bridge.cv2_to_imgmsg(bgr, encoding="bgr8")
             debug_msg = Image()
-            debug_msg.data = bgr.tobytes()
-            debug_msg.header = msg.header
+            debug_msg.data = self.bgr.tobytes()
+            debug_msg.height = self.bgr.shape[0]
+            debug_msg.width = self.bgr.shape[1]
+            debug_msg.encoding = "bgr8"
+            debug_msg.step = self.bgr.shape[1] * 3
+            debug_msg.header = image_msg.header
             self.pub_debug.publish(debug_msg)
             return
         
@@ -561,10 +584,12 @@ class HumanStateDetectorNode(Node):
         
         all_markers = MarkerArray()
         all_states = []
+        hand_up_found = False  # 이번 프레임에서 hand up 감지 여부
+        hand_up_bbox = None  # hand up한 사람의 bbox
         
         for person_idx, kp in enumerate(keypoints_data):
             # 3D 스켈레톤 추출
-            skeleton = self.extract_skeleton_3d(kp, bgr.shape)
+            skeleton = self.extract_skeleton_3d(kp, self.bgr.shape)
             
             if len(skeleton.keypoints) < 5:
                 continue
@@ -572,6 +597,13 @@ class HumanStateDetectorNode(Node):
             # 상태 판별
             state, angles = self.state_detector.detect_state(skeleton)
             all_states.append(f"P{person_idx}:{state.name}")
+            
+            # Hand up 상태 확인
+            if state in [HumanState.HAND_UP_LEFT, HumanState.HAND_UP_RIGHT, HumanState.HAND_UP_BOTH]:
+                hand_up_found = True
+                # 첫 번째 hand up 사람의 bbox 저장
+                if hand_up_bbox is None and boxes is not None and person_idx < len(boxes):
+                    hand_up_bbox = boxes[person_idx]  # [x1, y1, x2, y2]
             
             # 디버그 이미지에 상태 그리기
             if boxes is not None and person_idx < len(boxes):
@@ -581,7 +613,7 @@ class HumanStateDetectorNode(Node):
             
             # 마커 생성
             if self.publish_markers:
-                markers = self.create_skeleton_markers(skeleton, person_idx, state, msg.header.stamp)
+                markers = self.create_skeleton_markers(skeleton, person_idx, state, image_msg.header.stamp)
                 all_markers.markers.extend(markers.markers)
         
         # 상태 발행
@@ -594,11 +626,40 @@ class HumanStateDetectorNode(Node):
         if self.publish_markers and all_markers.markers:
             self.pub_markers.publish(all_markers)
         
+        # Hand up 강건성 검증 (5프레임 이상 감지)
+        if hand_up_found:
+            self.hand_up_counter += 1
+            if self.hand_up_counter >= self.min_detection_frames and not self.hand_up_detected:
+                self.hand_up_detected = True
+                self.get_logger().info(f"✋ Hand up detected for {self.min_detection_frames} consecutive frames!")
+                
+                # Bool 메시지 발행
+                hand_up_msg = Bool()
+                hand_up_msg.data = True
+                self.pub_hand_up.publish(hand_up_msg)
+                
+                # Bbox 발행 (x1, y1, x2, y2)
+                if hand_up_bbox is not None:
+                    bbox_msg = Float32MultiArray()
+                    bbox_msg.data = [float(hand_up_bbox[0]), float(hand_up_bbox[1]), 
+                                     float(hand_up_bbox[2]), float(hand_up_bbox[3])]
+                    self.pub_hand_up_bbox.publish(bbox_msg)
+                    self.get_logger().info(f"📦 Published hand up bbox: [{hand_up_bbox[0]:.1f}, {hand_up_bbox[1]:.1f}, {hand_up_bbox[2]:.1f}, {hand_up_bbox[3]:.1f}]")
+        else:
+            if self.hand_up_counter > 0:
+                self.get_logger().debug(f"Hand up counter reset from {self.hand_up_counter}")
+            self.hand_up_counter = 0
+            self.hand_up_detected = False
+        
         # 디버그 이미지 발행
         #debug_msg = self.bridge.cv2_to_imgmsg(annotated, encoding="bgr8")
         debug_msg = Image()
         debug_msg.data = annotated.tobytes()
-        debug_msg.header = msg.header
+        debug_msg.height = annotated.shape[0]
+        debug_msg.width = annotated.shape[1]
+        debug_msg.encoding = "bgr8"
+        debug_msg.step = annotated.shape[1] * 3
+        debug_msg.header = image_msg.header
         self.pub_debug.publish(debug_msg)
 
 

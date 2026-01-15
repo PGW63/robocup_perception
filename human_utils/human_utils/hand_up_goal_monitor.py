@@ -34,7 +34,7 @@ class HandUpGoalMonitor(Node):
         self.declare_parameter("min_skeleton_points", 5)  # 최소 스켈레톤 점 개수
         self.declare_parameter("stop_distance", 0.4)  # 정지 거리 임계값 (미터)
         self.declare_parameter("distance_check_rate", 2.0)  # 거리 체크 주기 (Hz)
-        self.declare_parameter("use_nav2", True)  # nav2 action 사용 여부
+        self.declare_parameter("use_nav2", False)  # nav2 action 사용 여부
         self.declare_parameter("continuous_goal_publish", True)  # goal 계속 발행 여부 (True: 계속, False: 한 번만)
         
         # 강건성 파라미터

@@ -1,0 +1,3 @@
+vision_msgs/BoundingBox2D inha_bbox
+sensor_msgs/CompressedImage inha_image
+

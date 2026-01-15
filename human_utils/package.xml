@@ -7,6 +7,13 @@
   <maintainer email="nvidia@todo.todo">nvidia</maintainer>
   <license>TODO: License declaration</license>
 
+
+  <build_depend>rclpy</build_depend>
+  <build_depend>sensor_msgs</build_depend>
+  <build_depend>std_msgs</build_depend>
+  <build_depend>vision_msgs</build_depend>
+
+
   <test_depend>ament_copyright</test_depend>
   <test_depend>ament_flake8</test_depend>
   <test_depend>ament_pep257</test_depend>
